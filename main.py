@@ -1,0 +1,233 @@
+import cv2 as cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import skimage
+
+def show_images(source, transformed, title="Image"):
+    plt.figure(figsize=(10, 4))
+    plt.suptitle(title, fontsize=16)
+
+    plt.subplot(1, 2, 1)
+    plt.imshow(source, cmap='gray')
+    plt.title('Source Image')
+    plt.text(10, 10, f'Resolution: {source.shape[1]}x{source.shape[0]}', color='white', backgroundcolor='black', fontsize=8, ha='left', va='top')
+    plt.axis('off')
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(transformed, cmap='gray')
+    plt.title('Transformed Image')
+    plt.text(10, 10, f'Resolution: {transformed.shape[1]}x{transformed.shape[0]}', color='white', backgroundcolor='black', fontsize=8, ha='left', va='top')
+    plt.axis('off')
+
+    # adjust space between images
+    plt.subplots_adjust(wspace=0.3, hspace=0.3)
+    plt.subplots_adjust(left=0.05, right=0.95)
+
+    # save image
+    plt.savefig(f"results/{title}.png")
+
+
+def calc_gradient(img, x, y):
+    '''
+        Calculate gradient of the image at position (x, y)
+    '''
+    x_grad = img[y, x + 1] - img[y, x - 1]
+    y_grad = img[y + 1, x] - img[y - 1, x]
+    return max(x_grad, y_grad)
+
+
+def calc_gradient_threshold(img):
+    '''
+        Calculate gradient threshold for image 
+    '''
+    numerator = sum(img[y, x] * calc_gradient(img, x, y) for y in range(1, img.shape[0] - 1) for x in range(1, img.shape[1] - 1))
+    denominator = sum(calc_gradient(img, x, y) for y in range(1, img.shape[0] - 1) for x in range(1, img.shape[1] - 1))
+    return numerator / denominator
+
+
+def weber_segmentation(img):
+    def w(i):
+        if 0 <= i <= 88:
+            return 20 - 12 * i / 88
+        if 88 < i <= 138:
+            return 0.002 * (i - 88) ** 2
+        else:
+            return 7 * (i - 138) / 117
+
+
+    def picture_set_pixels(src_img, new_img, from_color, to_color, target_color):
+        mask = (img >= from_color) & (img <= to_color)
+        new_img[mask] = target_color
+
+    new_img = np.zeros_like(img)
+    current_color = 0 
+    n = 1
+    while current_color <= 255:
+        if current_color in img:
+            picture_set_pixels(img, new_img, current_color, current_color + w(current_color), current_color)
+            n += 1 
+            current_color += int(w(current_color))
+        current_color += 1
+    print(f"Weber segmentation: {n} colors")
+    return new_img 
+
+
+# open image
+img = cv2.imread('image.png', cv2.IMREAD_GRAYSCALE)
+assert img is not None, 'Image not found'
+
+# mean threshold binarization
+threshold = (int(img.max() - img.min())) / 2
+th, img_binarized_mean = cv2.threshold(img, threshold, 255, cv2.THRESH_BINARY)
+th, img_binarized_mean_inv = cv2.threshold(img, threshold, 255, cv2.THRESH_BINARY_INV)
+show_images(img, img_binarized_mean, 'Mean threshold')
+show_images(img, img_binarized_mean_inv, 'Mean threshold inverted')
+
+# gradient threshold binarization
+threshold = int(calc_gradient_threshold(img) * 255)
+print(f"Gradient threshold is {threshold}")
+th, img_binarized_gradient = cv2.threshold(img, threshold, 255, cv2.THRESH_BINARY)
+th, img_binarized_gradient_inv = cv2.threshold(img, threshold, 255, cv2.THRESH_BINARY_INV)
+show_images(img, img_binarized_gradient, 'Gradient threshold')
+show_images(img, img_binarized_gradient_inv, 'Gradient threshold inverted')
+
+# Otsu threshold binarization
+threshold, img_binarized_otsu = cv2.threshold(img, 33, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+threshold, img_binarized_otsu_inv = cv2.threshold(img, 33, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+print(f"Otsu threshold is {threshold}")
+show_images(img, img_binarized_otsu, 'Otsu threshold')
+show_images(img, img_binarized_otsu_inv, 'Otsu threshold inverted')
+
+# Adaptive threshold binarization (mean)
+img_binarized_adaptive = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 2)
+img_binarized_adaptive_inv = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+show_images(img, img_binarized_adaptive, 'Adaptive threshold mean')
+show_images(img, img_binarized_adaptive_inv, 'Adaptive threshold mean inverted')
+
+# Adaptive threshold binarization (gaussian)
+img_binarized_adaptive = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 9, 2)
+img_binarized_adaptive_inv = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 9, 2)
+show_images(img, img_binarized_adaptive, 'Adaptive threshold Gaussian')
+show_images(img, img_binarized_adaptive_inv, 'Adaptive threshold Gaussian inverted')
+
+# weber segmentation
+img_weber = weber_segmentation(img)
+show_images(img, img_weber, 'Weber segmentation')
+
+
+# open image
+img = cv2.imread('puziki.png')
+assert img is not None, 'Image not found'
+
+img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+img_lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+
+L, a, b = cv2.split(img_lab)
+ab = cv2.merge((a, b))
+ab = ab.reshape((-1, 2)).astype(np.float32)
+
+k = 5
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1)
+compactness, labels, centers = cv2.kmeans(ab, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+
+# image with segmented classes 
+img_labels = labels.reshape(img.shape[0], img.shape[1])
+show_images(img_rgb, img_labels, 'K-means segmentation')
+
+img_segmented_lab = np.zeros_like(img_lab)
+# add l channel
+img_segmented_lab[:, :, 0] = L
+
+segmented_frames = []
+for i in range(k):
+    img_tmp = np.ones_like(img_lab) * 255
+    mask = (labels == i).reshape(img.shape[0], img.shape[1])
+    img_tmp[mask] = img_rgb[mask, :]
+    segmented_frames.append(img_tmp)
+    ab_center = np.uint8(centers[i])
+    img_segmented_lab[mask, 1:] = ab_center
+
+for i in range(k):
+    show_images(img_rgb, segmented_frames[i], f'K-means segment {i}')
+
+img_segmented_rgb = cv2.cvtColor(img_segmented_lab, cv2.COLOR_LAB2RGB)
+show_images(img_rgb, img_segmented_rgb, 'K-means segmentation RGB')
+
+
+
+# Texture segmentation 
+
+def calc_params(img):
+    p = cv2.calcHist([img], [0], img, [256], [0, 256]) / np.prod(img.shape) # normalized hist
+    m = np.sum([i * p[i] for i in range(256)]) # mean
+    # print(f"Mean of image: {m}")
+
+    mu_n = lambda n: np.sum([(i - m) ** n * p[i] for i in range(256)]) # n-th moment
+    dispersion_norm = mu_n(2) / 255 ** 2  # dispersion
+    # print(f"Dispersion of image: {dispersion_norm}")
+
+    R = 1 - 1 / (1 + dispersion_norm) # 
+    # print(f"R = {R}")
+
+    std_dev = np.sqrt(dispersion_norm) # standard deviation aka s 
+    # print(f"Standard deviation of image: {std_dev}")
+
+    E = -1 * np.sum([p[i] * np.log2(p[i]) for i in range(256) if p[i] != 0])
+    # print(f"Entropy of image: {E}")
+
+    U = np.sum([p[i] ** 2 for i in range(256)])
+
+    mu_3 = mu_n(3) / 255 ** 3
+    # print(f"Uniformity of image: {U}")
+
+    return {'mean': m, 'dispersion': dispersion_norm, 'R': R, 'std_dev': std_dev, 'entropy': E, 'uniformity': U, 'mu_3': mu_3}
+
+
+# open image
+img = cv2.imread('mountain.jpeg', cv2.IMREAD_GRAYSCALE)
+assert img is not None, 'Image not found'
+
+E = skimage.filters.rank.entropy(img, skimage.morphology.square(9)).astype(np.float32)
+Eim = (E - E.min()) / (E.max() - E.min())
+ret, BW_E = cv2.threshold(np.uint8(Eim * 255), 0, 255, cv2.THRESH_OTSU)
+
+show_images(img, E, 'Entropy of image')
+show_images(img, BW_E, 'Entropy of image (binarized)')
+
+BW_E_SR = skimage.morphology.remove_small_holes(BW_E, area_threshold=4000, connectivity=5).astype(np.uint8)
+BW_E_SR_SO = skimage.morphology.remove_small_objects(BW_E_SR, min_size=4000, connectivity=5).astype(np.uint8)
+
+show_images(img, BW_E_SR, 'Entropy of image (binarized, small regions removed)')
+show_images(img, BW_E_SR_SO, 'Entropy of image (binarized, small objects removed)')
+
+
+# draw contours
+contour_img = np.copy(img)
+contours, hierarchy = cv2.findContours(BW_E_SR_SO, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+img_contours = cv2.drawContours(contour_img, contours, -1, (0, 255, 0), 3)
+
+show_images(img, img_contours, 'Contours of image')
+
+smooth_part = img.copy()
+smooth_part[BW_E_SR_SO == 1] = 0 
+
+grainy_part = img.copy()
+grainy_part[BW_E_SR_SO == 0] = 0
+
+show_images(img, smooth_part, 'Smooth part of image')
+show_images(img, grainy_part, 'Grainy part of image')
+
+# calculate parameters of image 
+params = calc_params(img)
+print(params)
+
+# calculate parameters of smooth part
+params_smooth = calc_params(img[BW_E_SR_SO == 0])
+print(params_smooth)
+
+# calculate parameters of grainy part
+params_grainy = calc_params(img[BW_E_SR_SO == 1])
+print(params_grainy)
+
+
+plt.show()
