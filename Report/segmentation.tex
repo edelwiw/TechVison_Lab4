@@ -1,0 +1,265 @@
+\section{Сегментация изображений}
+
+\subsection{На основе принципа Вебера}
+
+Принцип Вебера подразумевает, что человеческий глаз плохо воспринимает разницу 
+уровней серого между $I(n)$ и $I(n) + W(I(n))$, где $W(I(n))$ -- функция Вебера, 
+$n$ -- номер класса, $I$ -- кусочно-нелинейная функция градации серого. 
+
+Функция Вебера определяется следующим образом:
+\begin{equation}
+    W(I) = \begin{cases}
+        20 - \frac{12I}{88}, & 0 \le I \le 88, \\
+        0.002 (I - 88)^2, & 88 < I \le 138, \\
+        \frac{7(I - 138)}{117} + 13.138, & 138 < I \le 255.
+    \end{cases}
+    \label{eq:weber}
+\end{equation}
+
+Можно объединить уровни серого из диапазона $I(n), I(n) + W(I(n))$ затем заменив их один значением интенсивности. 
+
+Алгоритм сегментации состоит из следующих шагов:
+\begin{enumerate}
+    \item Инициализация начальных условий: номер первого класса $n = 1$, уровень серого $I(n) = 0$. 
+    \item Вычисление $W(I(n))$ по формуле \eqref{eq:weber} и присвоение значения интенсивности $I(n)$ всем пикселям из диапазона $I(n), I(n) + W(I(n))$.
+    \item Поиск пикселей с интенсивностью выше $G = I(n) + W(I(n)) + 1$. Если найдены, то увеличение номера класса $n = n + 1$. В противном случае закончить работу. 
+\end{enumerate}
+
+В результате изображение будет сегментировано на $n$ классов интенсивностью $W(I(n))$. 
+
+Результат применения алгоритма сегментации на основе принципа Вебера к исходному изображению \ref{img:source} представлен на рисунке \ref{img:weber_segmentation}.
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/Weber segmentation.png}
+    \caption{Результат сегментации изображения на основе принципа Вебера}
+    \label{img:weber_segmentation}
+\end{figure}
+
+Визуально не заметно никакой разницы между изображениями. Мы сами сначала даже не поверили, 
+что алгоритм работает, но потом сели и честно посчитали каждый пиксель на изображении. 
+Цветов оказалось всего 74, ровно как и сказал алгоритм! Вся команда была просто в школе, когда увидела это! 
+Вебер красавчик, ставим лайк. 
+
+\subsection{На основе цветового пространства CIE Lab}
+
+В пространстве CIE Lab цветовая информация разделяется на яркость (L) и два цветовых канала (a и b).
+Идея алгоритма состоит в разделении изображения на кластеры по цветовому пространству.
+
+\subsubsection{Алгоритм K-means}
+
+Идея алгоритма в определении центров для $k$ кластеров и отнесения каждого пикселя к ближайшему кластеру.
+
+Рассмотрим исходное цветное изображение, которое му будем сегментировать (см. рисунок \ref{img:source_color}).
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../puziki.png}
+    \caption{Исходное цветное изображение}
+    \label{img:source_color}
+\end{figure}
+
+Тут у многих возникнут флешбеки из детства, не пугайтесь, дальше будет хуже. 
+
+После применения алгоритма для нахождения 5 кластеров получим результат, представленный на рисунке \ref{img:kmeans_segmentation}.
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/K-means segmentation.png}
+    \caption{Результат сегментации изображения с использованием алгоритма K-means}
+    \label{img:kmeans_segmentation}
+\end{figure}
+Разные оттенки серого -- это разные кластеры. 
+
+Теперь рассмотрим каждый из кластеров отдельно: 
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/K-means segment 0.png}
+    \caption{Кластер 0}
+    \label{img:kmeans_cluster_0}
+\end{figure}
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/K-means segment 1.png}
+    \caption{Кластер 1}
+    \label{img:kmeans_cluster_1}
+\end{figure}
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/K-means segment 2.png}
+    \caption{Кластер 2}
+    \label{img:kmeans_cluster_2}
+\end{figure}
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/K-means segment 3.png}
+    \caption{Кластер 3}
+    \label{img:kmeans_cluster_3}
+\end{figure}
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/K-means segment 4.png}
+    \caption{Кластер 4}
+    \label{img:kmeans_cluster_4}
+\end{figure}
+
+\FloatBarrier
+Видно, что на каждом кластере, как и ожидалось, преобладает один цвет. Телепузиков удалось разделить друг от друга. 
+
+Теперь можно заменить $a, b$ составляющие каждого пикселя на среднее значение по кластеру, перейти обратно в пространство RGB и получить сегментированное изображение (см. рисунок \ref{img:kmeans_segmentation_RGB}).
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/K-means segmentation RGB.png}
+    \caption{Сегментированное изображение с использованием алгоритма K-means}
+    \label{img:kmeans_segmentation_RGB}
+\end{figure}
+При этом яркостная составляющая изображения остается неизменной, что позволяет сохранить детали изображения.
+
+\FloatBarrier
+\subsection{Текстурная сегментация}
+
+В работе используется статистический подход, который описывает текстуру сегмента 
+как гладкую, грубую или зернистую. 
+
+Исходное изображение, содержащее два различных текстурных участка, представлено на рисунке \ref{img:texture_source}.
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../mountain.jpeg}
+    \caption{Исходное изображение для текстурной сегментации}
+    \label{img:texture_source}
+\end{figure}
+
+Будем рассматривать интенсивность изображения $I$ как случайную величину $z$, которой соответствует вероятность распределения 
+$p(z)$, вычисляемая из гистограммы изображения. \textit{Центральным моментом} порядка $n$
+случайной величины $z$ называется параметр $\mu_n(z)$, вычисляемый по формуле: 
+\begin{equation}
+    \mu_n(z) = \sum_{i = 0}^{L - 1} (z_i - m)^n p(z_i)
+    \label{eq:mu_n}
+\end{equation}
+где $L$ -- количество уровней интенсивности, $m$ -- среднее значение случайной величины $z$: 
+\begin{equation}
+    m = \sum_{i = 0}^{L - 1} z_i p(z_i)
+\end{equation}
+Из \eqref{eq:mu_n} следует, что $\mu_0 = 1$ и $\mu_1 = 0$. 
+
+Для описания текстуры изображения важна \textit{дисперсия случайной величины}, равная второму моменту 
+$\sigma^2(z) = \mu_2(z)$ и являющаяся мерой яркостного контраста, которую можно использовать для вычисления 
+признаков \textit{гладкости}. Введем меру относительной гладкости $R$:
+\begin{equation}
+    R = 1 - \frac{1}{1 + \sigma^2(z)}
+\end{equation}
+которая равна нулю для областей с постоянной интенсивностью (нулевой дисперсией) и приближающаяся к единице 
+для больших значений дисперсии $\sigma^2(z)$. Для полутоновых изображений с интервалом интенсивности $[0, 255]$ 
+необходимо нормировать дисперсию до интервала $[0, 1]$. Нормирование осуществляется делением дисперсии $\sigma^2(z)$
+на $(L - 1)^2$. В качестве характеристики текстуры часто используется \textit{стандартное отклонение}:
+\begin{equation}
+    s = \sigma(z)
+\end{equation}
+Третий момент является \textit{характеристикой симметрии гистограммы}. 
+
+Для оценки текстурных особенностей используется 
+функция \textit{энтропии} $E$, определяющая разброс интенсивностей соседних пикселей. 
+\begin{equation}
+    E = -\sum_{i = 0}^{L - 1} p(z) \log_2 p(z_i)
+\end{equation}
+
+Еще одной важной характеристикой, описывающей текстуру, является \textit{мера однородности} $U$, оценивающая равномерность гистограммы: 
+\begin{equation}
+    U = \sum_{i = 0}^{L - 1} p^2(z_i)
+\end{equation}
+После вычисления какого-либо признака или набора признаков необходимо построить бинарную маску, на основе которой и будет проводиться сегментация. 
+
+Энтропия исходного изображения в окрестности $(9 \times 9)$ каждого пикселя и ее бинаризованной мо методу Отсу вариант представлены на рисунках \ref{img:texture_entropy} и \ref{img:texture_entropy_bin} соответственно.
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/Entropy of image.png}
+    \caption{Энтропия исходного изображения}
+    \label{img:texture_entropy}
+\end{figure}
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/Entropy of image (binarized).png}
+    \caption{Бинаризованная энтропия изображения}
+    \label{img:texture_entropy_bin}
+\end{figure}
+
+\FloatBarrier
+После этого необходимо использовать морфологические фильтры для того, чтобы удалить связные области, содержащее
+менее заданного количества пикселей, а затем для удаления внутренних дефектов формы. (см. рисунок \ref{img:BW_E_SR} и \ref{ing:BW_E_SR_OR}).
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/Entropy of image (binarized, small regions removed).png}
+    \caption{Бинаризованная энтропия изображения после удаления малых областей}
+    \label{img:BW_E_SR}
+\end{figure}
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/Entropy of image (binarized, small objects removed).png}
+    \caption{Бинаризованная энтропия изображения после удаления малых областей и внутренних дефектов}
+    \label{ing:BW_E_SR_OR}
+\end{figure}
+
+Изображение с нанесенными контурами после сегментации представлено на рисунке \ref{img:regions}.
+Видим, что текстуры на изображении разделены на разные области корректно. 
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/Contours of image.png}
+    \caption{Изображение с контурами после сегментации}
+    \label{img:regions}
+\end{figure}
+
+Отдельно можно посмотреть на \textit{гладкие} и \textit{грубые} области изображения (см. рисунки \ref{img:smooth} и \ref{img:rough}).
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/Smooth part of image.png}
+    \caption{Гладкие области изображения}
+    \label{img:smooth}
+\end{figure}
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=\textwidth]{../results/Grainy part of image.png}
+    \caption{Грубые области изображения}
+    \label{img:rough}
+\end{figure}
+
+\begin{table}[ht!]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline
+        Область & $m$ & $\mu_3(z)$ & $R$ & $\sigma$ & $E$ & $U$ \\
+        \hline
+        Гладкая &  116.7 & 0 & 0.0045 & 0.0674 & 5.6305 & 0.0249\\
+        \hline
+        Все изображение & 120.2 & -0.0004 &  0.0182 & 0.1363 & 6.8281 & 0.0125 \\
+        \hline
+        Грубая &  125.1 & -0.0379 & 0.0012 & 0.1948 & 7.4204 & 0.0061\\
+        \hline
+    \end{tabular}
+    \caption{Параметры текстурных областей}
+    \label{tab:texture_params}
+\end{table}
+
+\FloatBarrier
+В таблице \ref{tab:texture_params} видим, что при уменьшении \textit{гладкости} области, для которой определялись параметры: 
+\begin{itemize}
+    \item Значение \textbf{гладкости} $R$ \textbf{уменьшается}
+    \item Значение \textbf{меры однородности} $U$ \textbf{уменьшается}
+    \item Значение \textbf{стандартного отклонения} $\sigma$ \textbf{увеличивается}
+    \item Значение \textbf{энтропии} $E$ \textbf{увеличивается}
+\end{itemize}
+
+Есть закономерность значений параметров от текстуры области, для которой они находились. 
+Таким образом, можно сделать вывод, что параметры текстурных областей могут быть использованы для сегментации изображений 
+и определения \textit{гладкости} текстурных областей.
